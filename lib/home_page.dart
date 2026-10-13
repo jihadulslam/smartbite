@@ -1,6 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'recipe_detail_page.dart';
+import 'explore_page.dart';
+import 'grocery_page.dart';
+import 'saved_page.dart';
+import 'profile_page.dart';
+import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -10,51 +17,67 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Custom brand color extracted from Figma (Maroon/Dark Red)
   final Color _primaryColor = const Color(0xFF7A232E);
 
-  String userName = "User"; // Default fallback name
+  String userName = "User";
   bool isLoading = true;
-  int _currentIndex = 0; // Index for Bottom Navigation Bar
+  int _currentIndex = 0;
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
-  }
-
-  // Fetch logged-in user's full name from Firestore 'users' collection
-  Future<void> _fetchUserData() async {
-    try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
-
-        if (userDoc.exists) {
+    // Use authStateChanges to automatically update UI on login/logout
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (user != null) {
+        _fetchUserData(user);
+      } else {
+        if (mounted) {
           setState(() {
-            userName = userDoc.get('fullName') ?? "User";
-            isLoading = false;
-          });
-        } else {
-          setState(() {
+            userName = "User";
             isLoading = false;
           });
         }
       }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchUserData(User currentUser) async {
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (userDoc.exists && mounted) {
+        setState(() {
+          userName = userDoc.get('fullName') ?? "User";
+          isLoading = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F9), // Clean off-white background for body
+      backgroundColor: const Color(0xFFFAF9F9),
       body: SafeArea(
         child: isLoading
             ? Center(child: CircularProgressIndicator(color: _primaryColor))
@@ -62,9 +85,8 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Red Header Container (Figma Style)
               Container(
-                padding: const EdgeInsets.fromLTRB(20.0, 24.0, 20.0, 28.0), // Increased top and bottom padding for a taller, well-spaced look
+                padding: const EdgeInsets.fromLTRB(20.0, 24.0, 20.0, 28.0),
                 decoration: BoxDecoration(
                   color: _primaryColor,
                   borderRadius: const BorderRadius.only(
@@ -75,7 +97,6 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Greeting & Notification Row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -108,7 +129,6 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // Notification Icon with translucent circular background
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.15),
@@ -116,16 +136,13 @@ class _HomePageState extends State<HomePage> {
                           ),
                           child: IconButton(
                             icon: const Icon(Icons.notifications_outlined, size: 24, color: Colors.white),
-                            onPressed: () {
-                              // TODO: Implement notifications
-                            },
+                            onPressed: () {},
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24), // Increased spacing before search bar
+                    const SizedBox(height: 24),
 
-                    // Search Bar (White background inside red header)
                     TextField(
                       decoration: InputDecoration(
                         hintText: 'Search recipes, ingredients...',
@@ -133,13 +150,11 @@ class _HomePageState extends State<HomePage> {
                         prefixIcon: Icon(Icons.search, color: _primaryColor),
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.tune, color: Colors.black54),
-                          onPressed: () {
-                            // TODO: Filter action
-                          },
+                          onPressed: () {},
                         ),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16), // Slightly taller search bar
+                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -159,13 +174,11 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 20),
 
-              // Body Content (District-wise categories & Recipes) with horizontal padding
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // District-wise Categories Section Title
                     const Text(
                       'District-wise categories',
                       style: TextStyle(
@@ -176,7 +189,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Horizontal District Categories List
                     SizedBox(
                       height: 80,
                       child: ListView(
@@ -193,7 +205,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Popular Recipes Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -206,9 +217,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () {
-                            // TODO: View all recipes
-                          },
+                          onPressed: () {},
                           child: Text(
                             'See all',
                             style: TextStyle(
@@ -221,7 +230,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Recipe Card 1: Sylheti Lemon Chicken
                     _buildRecipeCard(
                       title: 'Sylheti lemon chicken',
                       tag: 'Sylhet',
@@ -231,7 +239,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Recipe Card 2: Vegetable Bhuna Khichuri
                     _buildRecipeCard(
                       title: 'Vegetable bhuna khichuri',
                       tag: 'Dhaka',
@@ -247,13 +254,21 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      // Bottom Navigation Bar matching Figma design
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() {
             _currentIndex = index;
           });
+          if (index == 1) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const ExplorePage()));
+          } else if (index == 2) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const GroceryPage()));
+          } else if (index == 3) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const SavedPage()));
+          } else if (index == 4) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
+          }
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: _primaryColor,
@@ -292,7 +307,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Helper widget for District Category item
   Widget _buildCategoryItem(String name, IconData icon) {
     return Container(
       width: 70,
@@ -316,7 +330,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Helper widget for Recipe Card
   Widget _buildRecipeCard({
     required String title,
     required String tag,
@@ -324,90 +337,96 @@ class _HomePageState extends State<HomePage> {
     required String calories,
     required String imageUrl,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Recipe Image with Tag & Bookmark
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Image.network(
-                  imageUrl,
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Positioned(
-                top: 12,
-                left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const RecipeDetailPage()),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Image.network(
+                    imageUrl,
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
                   ),
-                  child: Text(
-                    tag,
-                    style: TextStyle(
-                      color: _primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                ),
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      tag,
+                      style: TextStyle(
+                        color: _primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: CircleAvatar(
-                  backgroundColor: Colors.white.withOpacity(0.85),
-                  radius: 16,
-                  child: Icon(Icons.bookmark_border, color: _primaryColor, size: 20),
-                ),
-              ),
-            ],
-          ),
-          // Recipe Details
-          Padding(
-            padding: const EdgeInsets.all(14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$time  •  $calories',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white.withOpacity(0.85),
+                    radius: 16,
+                    child: Icon(Icons.bookmark_border, color: _primaryColor, size: 20),
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$time • $calories',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
